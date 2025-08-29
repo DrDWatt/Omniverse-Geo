@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  omniverse-kit:
+    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
+    platform: linux/amd64
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - NVIDIA_VISIBLE_DEVICES=void
+      - NVIDIA_DRIVER_CAPABILITIES=
+      - __GLX_VENDOR_LIBRARY_NAME=mesa
+    network_mode: host
+    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/autoplay.py", "/workspace/EarthOrbit.usd"]
+    # Note: Will need "xhost +local:docker" in terminal before running this
+
+  # Service for creating the scene only (used when USD file doesn't exist)
+  scene-creator:
+    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
+    platform: linux/amd64
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - NVIDIA_VISIBLE_DEVICES=void
+      - NVIDIA_DRIVER_CAPABILITIES=
+      - __GLX_VENDOR_LIBRARY_NAME=mesa
+    network_mode: host
+    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/create_scene.py"]
+    profiles:
+      - creator-only
+
+  # Testing environment
+  test:
+    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
+    platform: linux/amd64
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-host.docker.internal:0}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - NVIDIA_VISIBLE_DEVICES=void
+      - NVIDIA_DRIVER_CAPABILITIES=
+      - __GLX_VENDOR_LIBRARY_NAME=mesa
+    network_mode: host
+    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/run_tests.py"]
+    profiles:
+      - test

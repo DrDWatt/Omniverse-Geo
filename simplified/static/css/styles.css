@@ -1,0 +1,40 @@
+/* Satellite-Orbit Visualization Styles */
+
+/* Canvas container */
+#app canvas {
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+}
+
+/* Custom range input styling */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  background: #2563eb;
+  transform: scale(1.1);
+}
+
+/* Animation for Earth rotation */
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
