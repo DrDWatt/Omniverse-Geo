@@ -11,20 +11,13 @@ services:
       MONGODB_PROD_DB: ${MONGODB_PROD_DB:-omniverse_geo_prod}
       SPACETRACK_USER: ${SPACETRACK_USER:-}
       SPACETRACK_PASS: ${SPACETRACK_PASS:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:19010}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:19010,http://192.168.1.75:19010,http://100.105.59.33:19010}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     ports:
       - "19011:19011"
     depends_on:
       - mongo
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     command: uvicorn main:app --host 0.0.0.0 --port 19011
 
   frontend:
@@ -32,7 +25,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:19011}
+      VITE_API_URL: ${VITE_API_URL:-http://100.105.59.33:19011}
       VITE_CESIUM_ION_TOKEN: ${VITE_CESIUM_ION_TOKEN:-}
     ports:
       - "19010:19010"
