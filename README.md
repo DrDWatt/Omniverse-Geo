@@ -1,63 +1,103 @@
-# NVIDIA Omniverse "Satellite-Orbit" PoC for Apple Silicon
+# Omniverse-Geo
 
-This project demonstrates a simplified Omniverse application running on Apple Silicon (M1/M2/M3) Macs using Docker and Rosetta 2 emulation.
+Omniverse-Geo is a fullstack geospatial intelligence platform for live satellite tracking. It replaces the original Apple Silicon Omniverse proof of concept with an NVIDIA DGX/CUDA-oriented FastAPI backend, MongoDB satellite cache, SGP4 orbital propagation, and a CesiumJS React frontend.
 
-## Prerequisites
+## Architecture
 
-| Requirement | Purpose | Installation |
-|-------------|---------|--------------|
-| Docker Desktop ≥ 4.29 | Runs x86_64 containers under Rosetta/QEMU | [Download](https://www.docker.com/products/docker-desktop) |
-| XQuartz | Local X-server so the container can open a window | `brew install --cask xquartz` (requires logout/login) |
-| NGC account + API key | Needed to pull NVIDIA Omniverse images | [Register at NGC](https://ngc.nvidia.com) |
+- `frontend/`: React, TailwindCSS, Lucide, shadcn-style components, and CesiumJS globe on port `19010`
+- `backend/`: FastAPI, Space-Track ingestion, MongoDB repository, SGP4 propagation, and natural-language satellite query agent on port `19011`
+- `mongo`: MongoDB satellite cache exposed on host port `19012`
+- CUDA runtime images and compose GPU reservations are used for DGX/NVIDIA hosts
 
-## Setup Instructions
+## Environment
 
-1. **Configure Docker Desktop**
-   - Open Docker Desktop
-   - Go to Settings → Features in development
-   - Enable "Use Rosetta for x86/amd64 emulation"
+Copy `.env.example` to `.env` and fill in credentials as needed. Do not commit `.env`.
 
-2. **Pull the Omniverse Kit container**
-   ```bash
-   docker login nvcr.io  # Enter your NGC credentials
-   docker pull nvcr.io/nvidia/omniverse/kit-kernel:106.5.0
-   ```
+```bash
+cp .env.example .env
+```
 
-3. **Start XQuartz**
-   - Launch XQuartz from your Applications folder
-   - Go to XQuartz → Preferences → Security
-   - Check "Allow connections from network clients"
-   - Restart XQuartz
+Required variables:
 
-## Project Structure
+- `SPACETRACK_USER`: Space-Track.org username
+- `SPACETRACK_PASS`: Space-Track.org password
+- `MONGODB_DEV_DB`, `MONGODB_TEST_DB`, `MONGODB_PROD_DB`: separate database names per environment
+- `VITE_CESIUM_ION_TOKEN`: optional Cesium ion token for production terrain/assets
 
-- `assets/` - Contains 3D model files
-  - `earth.glb` - Textured Earth sphere
-  - `satellite.glb` - Low-poly satellite model
-- `EarthOrbit.usd` - USD scene with Earth and orbiting satellite
-- `autoplay.py` - Script to automatically play the animation timeline
-- `run.sh` - Helper script to launch the Omniverse container
+## Run With Docker Compose
 
-## Running the Demo
+```bash
+docker compose up --build
+```
 
-1. Open a terminal and navigate to this project folder
-2. Make sure XQuartz is running
-3. Execute the run script:
-   ```bash
-   ./run.sh
-   ```
+Open:
 
-The Omniverse viewport will open, showing Earth with a satellite in orbit. The animation will automatically play in a continuous loop.
+- Frontend: `http://localhost:19010`
+- Backend health: `http://localhost:19011/health`
+- MongoDB: `mongodb://localhost:19012`
 
-## Technical Details
+On NVIDIA hosts, install the NVIDIA Container Toolkit so Docker can satisfy the GPU reservation.
 
-- The scene renders using CPU-only mode (no GPU acceleration)
-- Animation plays at 24fps with a 10-second loop (240 frames)
-- Earth is positioned at origin (0,0,0)
-- Satellite orbits around the Y-axis at a distance of ~6800 km (scaled)
+## Load Satellite Data
 
-## Troubleshooting
+After setting Space-Track credentials, ingest active TLE data:
 
-- If the window doesn't appear, check that XQuartz is running and properly configured
-- For "Cannot connect to X server" errors, try restarting XQuartz and verify its security settings
-- If Docker fails to pull the image, verify your NGC credentials and network connectivity
+```bash
+curl -X POST http://localhost:19011/satellites/ingest
+```
+
+Then use the app sidebar or query endpoint:
+
+```bash
+curl -X POST http://localhost:19011/satellites/agent \
+  -H "Content-Type: application/json" \
+  -d '{"query":"return altitude velocity and inclination for NORAD 25544"}'
+```
+
+## Local Backend Development
+
+```bash
+cd backend
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+ENVIRONMENT=development MONGODB_URI=mongodb://localhost:19012 uvicorn main:app --reload --port 19011
+```
+
+## Local Frontend Development
+
+```bash
+cd frontend
+npm install
+VITE_API_URL=http://localhost:19011 npm run dev
+```
+
+## Tests
+
+Backend:
+
+```bash
+cd backend
+pytest
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm test
+```
+
+Docker test profile:
+
+```bash
+docker compose --profile test up --build backend-test
+```
+
+## API Summary
+
+- `GET /health`: service status
+- `GET /satellites`: cached TLE records
+- `POST /satellites/ingest`: authenticate with Space-Track and cache active TLE records
+- `GET /satellites/{identifier}/position`: real-time SGP4 position for a NORAD ID or name
+- `POST /satellites/agent`: natural-language lookup for satellite altitude, velocity, inclination, and map targeting

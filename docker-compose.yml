@@ -1,57 +1,65 @@
-version: '3.8'
-
 services:
-  omniverse-kit:
-    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
-    platform: linux/amd64
-    volumes:
-      - .:/workspace
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      - DISPLAY=${DISPLAY:-host.docker.internal:0}
-      - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/tmp/.docker.xauth
-      - NVIDIA_VISIBLE_DEVICES=void
-      - NVIDIA_DRIVER_CAPABILITIES=
-      - __GLX_VENDOR_LIBRARY_NAME=mesa
-    network_mode: host
-    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/autoplay.py", "/workspace/EarthOrbit.usd"]
-    # Note: Will need "xhost +local:docker" in terminal before running this
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DEV_DB: ${MONGODB_DEV_DB:-omniverse_geo_dev}
+      MONGODB_TEST_DB: ${MONGODB_TEST_DB:-omniverse_geo_test}
+      MONGODB_PROD_DB: ${MONGODB_PROD_DB:-omniverse_geo_prod}
+      SPACETRACK_USER: ${SPACETRACK_USER:-}
+      SPACETRACK_PASS: ${SPACETRACK_PASS:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:19010}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    ports:
+      - "19011:19011"
+    depends_on:
+      - mongo
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: uvicorn main:app --host 0.0.0.0 --port 19011
 
-  # Service for creating the scene only (used when USD file doesn't exist)
-  scene-creator:
-    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
-    platform: linux/amd64
-    volumes:
-      - .:/workspace
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     environment:
-      - DISPLAY=${DISPLAY:-host.docker.internal:0}
-      - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/tmp/.docker.xauth
-      - NVIDIA_VISIBLE_DEVICES=void
-      - NVIDIA_DRIVER_CAPABILITIES=
-      - __GLX_VENDOR_LIBRARY_NAME=mesa
-    network_mode: host
-    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/create_scene.py"]
-    profiles:
-      - creator-only
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:19011}
+      VITE_CESIUM_ION_TOKEN: ${VITE_CESIUM_ION_TOKEN:-}
+    ports:
+      - "19010:19010"
+    depends_on:
+      - backend
+    command: npm run dev
 
-  # Testing environment
-  test:
-    image: nvcr.io/nvidia/omniverse/ov-kit-kernel:106.5.0
-    platform: linux/amd64
+  mongo:
+    image: mongo:7.0.15
+    ports:
+      - "19012:27017"
     volumes:
-      - .:/workspace
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - mongo-data:/data/db
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      - DISPLAY=${DISPLAY:-host.docker.internal:0}
-      - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/tmp/.docker.xauth
-      - NVIDIA_VISIBLE_DEVICES=void
-      - NVIDIA_DRIVER_CAPABILITIES=
-      - __GLX_VENDOR_LIBRARY_NAME=mesa
-    network_mode: host
-    command: ["/opt/nvidia/omniverse/kit-kernel/startup_nogpu.sh", "--no-window", "--exec", "/workspace/run_tests.py"]
+      ENVIRONMENT: test
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_TEST_DB: ${MONGODB_TEST_DB:-omniverse_geo_test}
+    depends_on:
+      - mongo
+    command: pytest
     profiles:
       - test
+
+volumes:
+  mongo-data:
