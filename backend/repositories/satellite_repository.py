@@ -45,9 +45,16 @@ class MongoSatelliteRepository(SatelliteRepository):
 
     async def find_by_identifier(self, identifier: str) -> SatelliteTle | None:
         normalized = identifier.strip()
+
+        # Try exact NORAD ID first
         if normalized.isdigit():
-            query = {"norad_id": int(normalized)}
-        else:
-            query = {"name": {"$regex": normalized, "$options": "i"}}
-        document = await self.collection.find_one(query, {"_id": 0})
+            document = await self.collection.find_one({"norad_id": int(normalized)}, {"_id": 0})
+            if document:
+                return SatelliteTle(**document)
+
+        # Fall back to name search (case-insensitive, partial match)
+        document = await self.collection.find_one(
+            {"name": {"$regex": normalized, "$options": "i"}},
+            {"_id": 0},
+        )
         return SatelliteTle(**document) if document else None

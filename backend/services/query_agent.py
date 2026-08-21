@@ -45,15 +45,20 @@ class SatelliteQueryAgent:
 
 
 def _extract_identifier(query: str) -> str | None:
-    norad_match = re.search(r"\b(?:norad\s*)?(\d{2,8})\b", query, re.IGNORECASE)
+    # Match "starlink-42", "starlink 42", "starlink satellite 42"
+    starlink_match = re.search(r"\bstarlink[-\s]*(?:satellite[-\s]*)?(\d+)\b", query, re.IGNORECASE)
+    if starlink_match:
+        return f"STARLINK-{starlink_match.group(1)}"
+
+    # Match explicit NORAD IDs (5+ digits to avoid catching short numbers like "42")
+    norad_match = re.search(r"\b(?:norad\s*)(\d{5,8})\b", query, re.IGNORECASE)
     if norad_match:
         return norad_match.group(1)
 
-    starlink_match = re.search(r"\b(starlink[-\s]?\d+)\b", query, re.IGNORECASE)
-    if starlink_match:
-        return starlink_match.group(1).replace(" ", "-")
-
-    name_match = re.search(r"(?:satellite|zoom into|show|find)\s+([a-z0-9\- ]+)", query, re.IGNORECASE)
+    # Match named satellites: "zoom into ISS", "show GOES 15", "find NOAA 20"
+    name_match = re.search(r"(?:satellite|zoom into|show|find|track)\s+([a-z0-9\-() ]+)", query, re.IGNORECASE)
     if name_match:
         return name_match.group(1).strip()
+
+    # Fallback: use the whole query as the search term
     return query.strip() or None

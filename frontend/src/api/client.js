@@ -16,6 +16,16 @@ export async function getSatellitePosition(identifier) {
   return response.json();
 }
 
+export async function getSatelliteOrbit(identifier, minutes = 90) {
+  const response = await fetch(
+    `${API_URL}/satellites/${encodeURIComponent(identifier)}/orbit?minutes=${minutes}&step_seconds=30`
+  );
+  if (!response.ok) {
+    throw new Error("Orbit data unavailable");
+  }
+  return response.json();
+}
+
 export async function askAgent(query) {
   const response = await fetch(`${API_URL}/satellites/agent`, {
     method: "POST",
